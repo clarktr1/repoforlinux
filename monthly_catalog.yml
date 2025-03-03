@@ -1,0 +1,29 @@
+---
+- name: Clone monthly-catalog and set up services
+  hosts: webservers
+  pre_tasks:
+    - name: Get the release timestamp
+      ansible.builtin.command: date +%Y%m%d%H%M%S
+      register: timestamp
+      check_mode: false
+      tags:
+        - always
+      changed_when: false
+  roles:
+    - role: server_setup
+      tags:
+        - server
+        - full
+    - role: monthly_catalog
+      tags:
+        - deploy
+        - setup
+        - full
+    - role: reset_catalog
+      tags:
+        - reset
+        - setup
+        - full
+      vars:
+        timestamp: "{{ timestamp.stdout }}"
+   

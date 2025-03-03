@@ -1,0 +1,114 @@
+---
+- name: Check that system requirements are installed
+  ansible.builtin.yum:
+    name:
+      - python3
+      - python3-pip
+      - python3-devel
+      - python3-virtualenv
+      - python3-policycoreutils
+      - python3-libselinux
+    state: present
+  become: true
+
+- name: Create the deployment directory
+  ansible.builtin.file:
+    dest: '{{ deploy_dir }}'
+    state: directory
+    owner: '{{ ansible_user_id }}'
+    group: '{{ ansible_user_id }}'
+    mode: '0755'
+  become: true
+
+- name: Initialize the deploy root
+  community.general.deploy_helper:
+    path: '{{ deploy_dir }}'
+    shared_path: ''
+
+- name: Create release directory
+  ansible.builtin.file:
+    dest: '{{ deploy_helper.new_release_path }}'
+    state: directory
+    owner: '{{ ansible_user_id }}'
+    group: '{{ ansible_user_id }}'
+    mode: '0755'
+
+- name: Clone the monthly-catalog repo
+  ansible.builtin.git:
+    dest: '{{ deploy_helper.new_release_path }}'
+    repo: 'git@code.library.unt.edu:unt-libraries/monthly-catalog.git'
+    accept_hostkey: true
+    version: '{{ branch }}'
+
+- name: Create the virtual environment
+  ansible.builtin.pip:
+    virtualenv: '{{ deploy_helper.new_release_path }}/env'
+    virtualenv_python: /usr/bin/python3
+    state: present
+    name: 'pip'
+
+- name: Update pip and setuptools
+  ansible.builtin.pip:
+    name:
+      - pip
+      - setuptools
+    virtualenv: '{{ deploy_helper.new_release_path }}/env'
+
+- name: Install the requirements
+  ansible.builtin.pip:
+    requirements: '{{ deploy_helper.new_release_path }}/requirements.txt'
+    virtualenv: '{{ deploy_helper.new_release_path }}/env'
+
+- name: Update Blacklight schema
+  ansible.builtin.copy: 
+    src: '{{ deploy_helper.new_release_path }}/schema.xml' 
+    dest: '{{ blacklight_dir }}/solr/conf/schema.xml'
+
+- name: Clean releases and create current symlink
+  community.general.deploy_helper:
+    path: '{{ deploy_dir }}'
+    release: '{{ deploy_helper.new_release_path }}'
+    state: finalize
+    keep_releases: 3
+  become: true
+  when: not ansible_check_mode
+
+- name: Grant group access to deployment directory
+  ansible.posix.acl:
+    path: '{{ deploy_dir }}'
+    entity: '{{ item }}'
+    etype: group
+    permissions: rwx
+    state: present
+  with_items:
+    - "libdigiadmins"
+    - "apache"
+  become: true
+  when: not ansible_check_mode
+
+- name: add the deployment directories to the list of directories selinux allows apache read-write access to
+  sefcontext:
+    setype: httpd_sys_rw_content_t
+    target: "/home/{{ monthly_catalog_app_name }}(/.*)?"
+  become: true
+  when: not ansible_check_mode
+
+- name: apply selinux file policies
+  command: restorecon -irv /home/{{ monthly_catalog_app_name }}
+  become: yes
+
+- name: Restart apache
+  ansible.builtin.service:
+    name: httpd
+    state: restarted
+  become: true
+
+- name: Restart Solr
+  ansible.builtin.systemd:
+    name: solr
+    state: restarted
+
+- name: Restart Blacklight
+  ansible.builtin.systemd:
+    name: blacklight
+    state: restarted

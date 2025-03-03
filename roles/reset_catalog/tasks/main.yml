@@ -1,0 +1,47 @@
+---
+- name: Remove indexed records
+  ansible.builtin.file:
+    path: '{{ solr_location }}/data/index'
+    state: absent
+
+- name: Remove old schema
+  ansible.builtin.file:
+    path: '{{ solr_location }}/conf/managed-schema.xml'
+    state: absent
+
+- name: Copy new schema to Solr configs
+  ansible.builtin.copy:
+    src: '{{ blacklight_dir }}/solr/conf/schema.xml'
+    dest: '{{ solr_location }}/conf/'
+    owner: solr
+    group: solr
+    mode: '755'
+
+- name: Run indexing script
+  ansible.builtin.shell: |
+    for file in '{{ release_dir }}/current/data/*.xml';
+      do python3 '{{ monthly_catalog_script }}' '$file';
+    done
+  args:
+    executable: /bin/bash
+  register: indexing_output
+
+- name: Create new log for results
+  ansible.builtin.file:
+    path: '{{ blacklight_dir }}/log/{{ timestamp }}_index.log'
+    state: touch
+
+- name: Populate log with indexing results
+  ansible.builtin.copy:
+    content: '{{ indexing_output.stdout }}'
+    dest: '{{ blacklight_dir }}/log/{{ timestamp }}_index.log'
+
+- name: Restart Solr
+  ansible.builtin.systemd:
+    name: solr
+    state: restarted
+
+- name: Restart Blacklight
+  ansible.builtin.systemd:
+    name: blacklight
+    state: restarted
