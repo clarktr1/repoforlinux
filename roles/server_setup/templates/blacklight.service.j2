@@ -1,0 +1,12 @@
+[Unit]
+Description=Blacklight
+After=network.target solr.service
+
+[Service]
+User=tdc0222
+WorkingDirectory=/home/blacklight/catalog
+ExecStart=/bin/bash -lc 'rails server -b 0.0.0.0'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

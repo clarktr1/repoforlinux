@@ -1,0 +1,102 @@
+---
+- name: Check that system requirements are installed
+  ansible.builtin.apt:
+    name:
+      - ruby
+      - rails
+      - nodejs
+      - default-jre
+      - yarn
+    state: present
+  become: true
+  when: not ansible_check_mode
+
+- name: Create the deployment directory
+  ansible.builtin.file:
+    dest: '{{ blacklight_home }}'
+    state: directory
+    owner: '{{ ansible_user_id }}'
+    group: '{{ ansible_user_id }}'
+    mode: '0755'
+  become: true
+
+- name: Initialize the deploy root
+  community.general.deploy_helper:
+    path: '{{ blacklight_home }}'
+    shared_path: ''
+
+- name: Create release directory
+  ansible.builtin.file:
+    dest: '{{ deploy_helper.new_release_path }}'
+    state: directory
+    owner: '{{ ansible_user_id }}'
+    group: '{{ ansible_user_id }}'
+    mode: '0755'
+
+- name: Install Blacklight
+  ansible.builtin.command:
+    cmd: rails new catalog --css bootstrap -m https://raw.github.com/projectblacklight/blacklight/main/template.demo.rb
+    chdir: "{{ deploy_helper.new_release_path }}"
+    creates: "{{ deploy_helper.new_release_path }}/catalog"
+
+- name: Update files
+  block:
+    - name: Verify directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - '{{ deploy_helper.new_release_path }}/catalog/app/assets/images/'
+        - '{{ deploy_helper.new_release_path }}/catalog/app/controllers/'
+        - '{{ deploy_helper.new_release_path }}/catalog/app/views/layouts/'
+        - '{{ deploy_helper.new_release_path }}/catalog/app/views/catalog/'
+        - '{{ blacklight_core}}'
+      become: true
+
+    - name: Update files
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - { src: "files/assets/", dest: '{{ deploy_helper.new_release_path }}/catalog/app/assets/images/' }
+        - { src: "files/controllers/", dest:  '{{ deploy_helper.new_release_path }}/catalog/app/controllers/' }
+        - { src: "files/layouts/", dest: '{{ deploy_helper.new_release_path }}/catalog/app/views/layouts/'}
+        - { src: "files/catalog/", dest: '{{ deploy_helper.new_release_path }}/catalog/app/views/catalog/' }
+      become: true
+
+    # - name: Deploy configuration file
+    #   ansible.builtin.template:
+    #     src: '{{ item.src }}'
+    #     dest: '{{ item.dest }}'
+    #     owner: root
+    #     group: root
+    #     mode: '0644'
+    #   loop: 
+    #     - { src: 'conf.properties.j2', dest: '{{ blacklight_core }}' }
+    #     - { src: 'Gemfile.j2', dest:  '{{ deploy_helper.new_release_path }}/catalog/Gemfile' }
+    #   become: true
+
+    - name: Install gems
+      ansible.builtin.command:
+        cmd: bundle install
+        chdir: '{{ deploy_helper.new_release_path }}/catalog'
+
+- name: Clean releases and create current symlink
+  community.general.deploy_helper:
+    path: '{{ blacklight_home }}'
+    release: '{{ deploy_helper.new_release_path }}'
+    state: finalize
+    keep_releases: 3
+  become: true
+  when: not ansible_check_mode
+
+
+
+
+  

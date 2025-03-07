@@ -1,0 +1,13 @@
+---
+branch: main
+monthly_catalog_app_name: monthly-catalog
+
+secret_key: wH3VRN6AljIM36uJCTFA3XawoQ/q4CEfsUeOxs1l3HiSAuKhn6pNWif3kVhj5cwC
+deploy_dir: /home/{{monthly_catalog_app_name}}
+release_dir: '{{ deploy_dir }}/releases'
+monthly_catalog_script: '{{ release_dir }}/code/solrdexer.py'
+blacklight_dir: /home/blacklight/catalog
+solr_location: /var/solr/data/blacklight-core
+
+blacklight_home: /home/blacklight
+blacklight_core: /var/solr/blacklight-core

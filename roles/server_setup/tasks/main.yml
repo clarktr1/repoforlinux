@@ -1,4 +1,22 @@
 ---
+# - name: Check for System requirements
+#   ansible.builtin.yum:
+#     name:
+#       - lsof
+#   state: present
+#   become: true
+#   when: not ansible_check_mode
+
+- name: Download Solr source tar
+  ansible.builtin.get_url:
+    url: https://www.apache.org/dyn/closer.lua/solr/solr/9.8.0/solr-9.8.0-src.tgz?action=download
+    dest: /home
+    mode: '0440'
+
+- name: Run the installation script
+  ansible.builtin.command: 'tar xzf solr-9.8.0.tgz solr-9.8.0/bin/install_solr_service.sh --strip-components=2 -n'
+
+
 - name: Setup solr.service files
   ansible.builtin.template:
     src: solr.service.j2

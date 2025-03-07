@@ -8,3 +8,5 @@ release_dir: '{{ deploy_dir }}/releases'
 monthly_catalog_script: '{{ release_dir }}/code/solrdexer.py'
 blacklight_dir: /home/blacklight/catalog
 solr_location: /var/solr/data/blacklight-core
+
+blacklight_home: /home/blacklight

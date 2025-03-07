@@ -14,14 +14,14 @@
       tags:
         - server
         - full
+    - role: deploy_blacklight
+      tags:
+        - blacklight
+        - setup
+        - full 
     - role: monthly_catalog
       tags:
         - deploy
-        - setup
-        - full
-    - role: reset_catalog
-      tags:
-        - reset
         - setup
         - full
       vars:
